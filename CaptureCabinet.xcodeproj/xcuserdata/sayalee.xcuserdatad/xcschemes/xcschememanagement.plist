@@ -7,7 +7,25 @@
 		<key>CaptureCabinet.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>0</integer>
+			<integer>1</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>CB86828F2E7FDBBD00E07ED5</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>CB86829C2E7FDBBE00E07ED5</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>CB8682A62E7FDBBE00E07ED5</key>
+		<dict>
+			<key>primary</key>
+			<true/>
 		</dict>
 	</dict>
 </dict>
