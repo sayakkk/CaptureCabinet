@@ -16,6 +16,8 @@ struct FolderDetailView: View {
     @FetchRequest var screenshots: FetchedResults<Screenshot>
     @State private var showingPhotoPicker = false
     @State private var showingPhotoPermissionAlert = false
+    @State private var showingFullScreen = false
+    @State private var selectedScreenshotIndex = 0
 
     init(folder: Folder) {
         self.folder = folder
@@ -34,8 +36,12 @@ struct FolderDetailView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 16) {
-                        ForEach(screenshots, id: \.id) { screenshot in
+                        ForEach(Array(screenshots.enumerated()), id: \.element.id) { index, screenshot in
                             ScreenshotView(screenshot: screenshot)
+                                .onTapGesture {
+                                    selectedScreenshotIndex = index
+                                    showingFullScreen = true
+                                }
                                 .onLongPressGesture {
                                     // Placeholder for scheduling reminder
                                     print("Schedule reminder tapped")
@@ -63,6 +69,13 @@ struct FolderDetailView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Please grant photo access in Settings to add screenshots.")
+        }
+        .fullScreenCover(isPresented: $showingFullScreen) {
+            FullScreenImageView(
+                isPresented: $showingFullScreen,
+                currentIndex: selectedScreenshotIndex,
+                screenshots: Array(screenshots)
+            )
         }
     }
     
