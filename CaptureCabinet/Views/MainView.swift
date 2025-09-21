@@ -21,7 +21,7 @@ struct MainView: View {
     @State private var showingPhotoPermissionAlert = false
     @State private var draggedAssetID: String?
     @State private var refreshID = UUID()
-    @State private var appLaunchTime: Date = Date().addingTimeInterval(-2592000) // 30일 전부터 (테스트용)
+    @State private var appLaunchTime: Date = Date().addingTimeInterval(-86400) // 24시간 전
     
     // 폴더 편집 관련 상태
     @State private var editingFolder: Folder? = nil
@@ -175,45 +175,31 @@ struct MainView: View {
     }
 
     private func fetchRecentScreenshots() {
-        print("📱 Fetching screenshots since app launch: \(appLaunchTime)")
+        print("📱 Fetching screenshots from last 24 hours: \(appLaunchTime)")
         print("🕐 Current time: \(Date())")
         
-        // 먼저 모든 이미지를 가져와서 테스트
-        let allFetchOptions = PHFetchOptions()
-        allFetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        allFetchOptions.fetchLimit = 100
-        
-        let allAssets = PHAsset.fetchAssets(with: .image, options: allFetchOptions)
-        print("🔍 Total images in Photos library: \(allAssets.count)")
-        
-        // 모든 이미지의 정보 출력
-        allAssets.enumerateObjects { obj, index, _ in
-            if index < 10 { // 처음 10개만 출력
-                print("📸 Asset \(index): \(obj.localIdentifier), Created: \(obj.creationDate ?? Date.distantPast)")
-            }
-        }
-        
-        // 이제 필터링된 결과 가져오기
+        // 스크린샷만 필터링하는 옵션 설정
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        fetchOptions.fetchLimit = 50
+        fetchOptions.fetchLimit = 100
         
-        // 앱 실행 이후의 스크린샷만 가져오기
-        fetchOptions.predicate = NSPredicate(format: "creationDate >= %@", appLaunchTime as NSDate)
+        // 스크린샷만 가져오는 predicate (24시간 내)
+        let screenshotPredicate = NSPredicate(format: "mediaSubtypes & %d != 0 AND creationDate >= %@", 
+                                            PHAssetMediaSubtype.photoScreenshot.rawValue, 
+                                            appLaunchTime as NSDate)
+        fetchOptions.predicate = screenshotPredicate
         
         let assets = PHAsset.fetchAssets(with: .image, options: fetchOptions)
         var result: [PHAsset] = []
-        var filteredAssets: [PHAsset] = []
         
-        print("🔍 Total assets found with predicate: \(assets.count)")
+        print("🔍 Total screenshots found in last 24 hours: \(assets.count)")
         
         // 이미 폴더로 이동된 스크린샷의 ID 목록 가져오기
         let movedScreenshotIDs = getMovedScreenshotIDs()
         print("📦 Already moved screenshot IDs: \(movedScreenshotIDs)")
         
         assets.enumerateObjects { obj, _, _ in
-            filteredAssets.append(obj)
-            print("📸 Filtered Asset: \(obj.localIdentifier), Created: \(obj.creationDate ?? Date.distantPast)")
+            print("📸 Screenshot: \(obj.localIdentifier), Created: \(obj.creationDate ?? Date.distantPast)")
             
             // 이미 폴더로 이동되지 않은 스크린샷만 포함
             if !movedScreenshotIDs.contains(obj.localIdentifier) {
@@ -221,8 +207,8 @@ struct MainView: View {
             }
         }
         
-        print("✅ Found \(result.count) new screenshots since app launch")
-        print("📊 Total images: \(allAssets.count), Filtered: \(filteredAssets.count), Moved: \(movedScreenshotIDs.count), Available: \(result.count)")
+        print("✅ Found \(result.count) new screenshots available for organization")
+        print("📊 Total screenshots: \(assets.count), Already moved: \(movedScreenshotIDs.count), Available: \(result.count)")
         recentScreenshots = result
     }
     
