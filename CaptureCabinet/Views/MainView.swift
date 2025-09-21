@@ -80,6 +80,9 @@ struct MainView: View {
                                 Text(folder.name ?? "Untitled")
                             }
                         }
+                        .buttonStyle(PlainButtonStyle())
+                        .contentShape(Rectangle())
+                        .allowsHitTesting(true)
                         .onDrop(of: [.text], isTargeted: nil) { providers in
                             print("🎯 DROP DETECTED on folder: \(folder.name ?? "Unknown")")
                             print("📦 Providers count: \(providers.count)")

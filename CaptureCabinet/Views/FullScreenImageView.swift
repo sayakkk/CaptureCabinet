@@ -59,7 +59,7 @@ struct FullScreenImageView: View {
                         .onEnded { value in
                             isDragging = false
                             
-                            // 아래로 충분히 드래그했으면 닫기, 100에서 50으로
+                            // 아래로 충분히 드래그했으면 닫기
                             if value.translation.height > 50 {
                                 withAnimation(.easeInOut(duration: 0.3)) {
                                     isPresented = false
