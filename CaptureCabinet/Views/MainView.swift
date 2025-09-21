@@ -22,6 +22,12 @@ struct MainView: View {
     @State private var draggedAssetID: String?
     @State private var refreshID = UUID()
     @State private var appLaunchTime: Date = Date().addingTimeInterval(-2592000) // 30일 전부터 (테스트용)
+    
+    // 폴더 편집 관련 상태
+    @State private var editingFolder: Folder? = nil
+    @State private var editingText: String = ""
+    @State private var showingDeleteAlert = false
+    @State private var folderToDelete: Folder? = nil
 
     var body: some View {
         NavigationView {
@@ -64,7 +70,15 @@ struct MainView: View {
                 List {
                     ForEach(folders, id: \.id) { folder in
                         NavigationLink(destination: FolderDetailView(folder: folder)) {
-                            Text(folder.name ?? "Untitled")
+                            if editingFolder?.id == folder.id {
+                                TextField("Folder Name", text: $editingText)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .onSubmit {
+                                        saveFolderName()
+                                    }
+                            } else {
+                                Text(folder.name ?? "Untitled")
+                            }
                         }
                         .onDrop(of: [.text], isTargeted: nil) { providers in
                             print("🎯 DROP DETECTED on folder: \(folder.name ?? "Unknown")")
@@ -78,8 +92,29 @@ struct MainView: View {
                                 .background(Color.blue.opacity(0.1))
                             : nil
                         )
+                        .contextMenu {
+                            Button("이름 바꾸기") {
+                                startEditing(folder: folder)
+                            }
+                            
+                            Button("복제하기") {
+                                duplicateFolder(folder: folder)
+                            }
+                            
+                            Button("삭제하기", role: .destructive) {
+                                folderToDelete = folder
+                                showingDeleteAlert = true
+                            }
+                        }
                     }
                     .onDelete(perform: deleteFolders)
+                }
+            }
+            .onTapGesture {
+                // 편집 모드에서 다른 곳을 터치하면 편집 취소
+                if editingFolder != nil {
+                    editingFolder = nil
+                    editingText = ""
                 }
             }
             .navigationTitle("캡비넷")
@@ -103,6 +138,16 @@ struct MainView: View {
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Please grant photo access in Settings to view your screenshots.")
+            }
+            .alert("폴더 삭제", isPresented: $showingDeleteAlert) {
+                Button("삭제하기", role: .destructive) {
+                    if let folder = folderToDelete {
+                        deleteFolder(folder: folder)
+                    }
+                }
+                Button("취소하기", role: .cancel) { }
+            } message: {
+                Text("정말로 삭제하시겠어요? 완전히 삭제됩니다.")
             }
         }
     }
@@ -345,6 +390,73 @@ struct MainView: View {
             let nsError = error as NSError
             print("❌ Core Data save error: \(nsError)")
             fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+        }
+    }
+    
+    // MARK: - 폴더 편집 관련 함수들
+    
+    private func startEditing(folder: Folder) {
+        editingFolder = folder
+        editingText = folder.name ?? "Untitled"
+    }
+    
+    private func saveFolderName() {
+        guard let folder = editingFolder else { return }
+        
+        folder.name = editingText.isEmpty ? "Untitled" : editingText
+        
+        do {
+            try viewContext.save()
+            editingFolder = nil
+            editingText = ""
+        } catch {
+            let nsError = error as NSError
+            print("❌ Error saving folder name: \(nsError)")
+        }
+    }
+    
+    private func duplicateFolder(folder: Folder) {
+        withAnimation {
+            // 새 폴더 생성
+            let newFolder = Folder(context: viewContext)
+            newFolder.id = UUID()
+            newFolder.name = "\(folder.name ?? "Untitled") Copy"
+            newFolder.createdAt = Date().addingTimeInterval(-1) // 바로 위에 배치하기 위해 1초 전으로 설정
+            
+            // 기존 폴더의 스크린샷들을 복제
+            if let screenshots = folder.screenshots {
+                for screenshot in screenshots {
+                    if let screenshot = screenshot as? Screenshot {
+                        let newScreenshot = Screenshot(context: viewContext)
+                        newScreenshot.id = UUID()
+                        newScreenshot.phAssetID = screenshot.phAssetID
+                        newScreenshot.createdAt = Date()
+                        newScreenshot.folder = newFolder
+                    }
+                }
+            }
+            
+            do {
+                try viewContext.save()
+                print("✅ Folder duplicated successfully")
+            } catch {
+                let nsError = error as NSError
+                print("❌ Error duplicating folder: \(nsError)")
+            }
+        }
+    }
+    
+    private func deleteFolder(folder: Folder) {
+        withAnimation {
+            viewContext.delete(folder)
+            
+            do {
+                try viewContext.save()
+                print("✅ Folder deleted successfully")
+            } catch {
+                let nsError = error as NSError
+                print("❌ Error deleting folder: \(nsError)")
+            }
         }
     }
 }
