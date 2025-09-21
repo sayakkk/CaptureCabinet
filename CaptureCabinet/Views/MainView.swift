@@ -109,6 +109,7 @@ struct MainView: View {
                     }
                     .onDelete(perform: deleteFolders)
                 }
+                .listRowSpacing(12)
             }
             .onTapGesture {
                 // 편집 모드에서 다른 곳을 터치하면 편집 취소
