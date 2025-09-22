@@ -114,13 +114,13 @@ struct MainView: View {
                 }
                 .listRowSpacing(12)
             }
-            .onTapGesture {
-                // 편집 모드에서 다른 곳을 터치하면 편집 취소
-                if editingFolder != nil {
-                    editingFolder = nil
-                    editingText = ""
-                }
-            }
+//            .onTapGesture {
+//                // 편집 모드에서 다른 곳을 터치하면 편집 취소
+//                if editingFolder != nil {
+//                    editingFolder = nil
+//                    editingText = ""
+//                }
+//            }
             .navigationTitle("캡비넷")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
