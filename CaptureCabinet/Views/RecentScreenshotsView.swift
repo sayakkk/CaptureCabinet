@@ -173,7 +173,12 @@ struct RecentScreenshotsView: View {
     private func loadRecentScreenshots() {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        fetchOptions.predicate = NSPredicate(format: "creationDate >= %@", appLaunchTime as NSDate)
+        
+        // Only screenshots since appLaunchTime
+        let datePredicate = NSPredicate(format: "creationDate >= %@", appLaunchTime as NSDate)
+        let screenshotSubtypeValue = PHAssetMediaSubtype.photoScreenshot.rawValue
+        let screenshotPredicate = NSPredicate(format: "(mediaSubtype & %d) != 0", screenshotSubtypeValue)
+        fetchOptions.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [datePredicate, screenshotPredicate])
         
         let assets = PHAsset.fetchAssets(with: .image, options: fetchOptions)
         var screenshots: [PHAsset] = []
