@@ -9,16 +9,20 @@ import SwiftUI
 
 struct PlaceholderView: View {
     var message: String
+    var icon: String = "photo.on.rectangle.angled"
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "photo.on.rectangle.angled")
+        VStack(spacing: Spacing.lg) {
+            Image(systemName: icon)
                 .font(.system(size: 48))
-                .foregroundColor(.secondary)
+                .foregroundColor(.textTertiary)
+            
             Text(message)
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundColor(.textSecondary)
+                .multilineTextAlignment(.center)
         }
-        .padding()
+        .padding(Spacing.xxxl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
