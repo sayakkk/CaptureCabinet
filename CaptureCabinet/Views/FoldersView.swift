@@ -39,28 +39,53 @@ struct FoldersView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Header
+                // Modern Header with enhanced design
                 HStack {
                     Text("폴더")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.textPrimary)
-                    
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color.textPrimary,
+                                    Color.textPrimary.opacity(0.9)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
                     Spacer()
-                    
+
                     Button(action: {
                         showingAddFolder = true
                     }) {
-                        Image(systemName: "plus")
-                            .font(.title3)
-                            .foregroundColor(.primaryBlue)
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.0, green: 0.5, blue: 1.0),
+                                            Color(red: 0.3, green: 0.35, blue: 0.9)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 40, height: 40)
+
+                            Image(systemName: "plus")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
                     }
                 }
                 .padding(.horizontal, Spacing.lg)
-                .padding(.vertical, Spacing.md)
-                
+                .padding(.top, Spacing.lg)
+                .padding(.bottom, Spacing.md)
+
                 Divider()
-                    .background(Color.textTertiary.opacity(0.3))
+                    .background(Color.textTertiary.opacity(0.15))
                 
                 if folders.isEmpty {
                     PlaceholderView(message: "폴더가 없습니다")
@@ -275,37 +300,108 @@ struct FolderCardView: View {
     @State private var isDropTargeted = false
     
     var body: some View {
-        VStack(spacing: Spacing.sm) {
-            Spacer()
-            Text(folder.name ?? "Untitled")
-                .font(.body)
-                .fontWeight(.bold)
-                .foregroundColor(.textPrimary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .center)
-            Spacer()
-        }
-        .frame(width: 100, height: 100)
-        .padding(Spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: CornerRadius.lg)
-                .fill(Color.surfacePrimary)
-        )
-        .overlay(
-            Group {
-                if isSelected && isDragging {
-                    RoundedRectangle(cornerRadius: CornerRadius.lg)
-                        .stroke(Color.primaryBlue, lineWidth: 3)
-                } else if isDropTargeted {
-                    RoundedRectangle(cornerRadius: CornerRadius.lg)
-                        .stroke(Color.primaryBlue.opacity(0.5), lineWidth: 2)
+        NavigationLink(destination: FolderDetailView(folder: folder)) {
+            VStack(spacing: 12) {
+                // Modern folder icon with gradient
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.58, blue: 0.0),
+                                    Color(red: 1.0, green: 0.45, blue: 0.0)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .shadow(color: Color.orange.opacity(0.3), radius: 8, x: 0, y: 4)
+
+                VStack(spacing: 4) {
+                    Text(folder.name ?? "Untitled")
+                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+
+                    // Screenshot count badge
+                    if let screenshots = folder.screenshots, screenshots.count > 0 {
+                        Text("\(screenshots.count)")
+                            .font(.system(.caption2, design: .rounded, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(Color.gray.opacity(0.12))
+                            )
+                    }
                 }
             }
-        )
-        .shadow(color: Shadow.small, radius: 2, x: 0, y: 1)
-        .scaleEffect(isHovered ? 1.05 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isHovered)
+            .frame(width: 100, height: 120)
+            .padding(Spacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        isSelected && isDragging
+                            ? LinearGradient(
+                                colors: [
+                                    Color.blue.opacity(0.15),
+                                    Color.blue.opacity(0.08)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [
+                                    Color.surfacePrimary,
+                                    Color.surfacePrimary.opacity(0.95)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        isSelected && isDragging
+                            ? LinearGradient(
+                                colors: [
+                                    Color.blue.opacity(0.6),
+                                    Color.blue.opacity(0.3)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.3),
+                                    Color.white.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                        lineWidth: isSelected && isDragging ? 2 : 1
+                    )
+            )
+            .shadow(
+                color: isSelected && isDragging ? Color.blue.opacity(0.3) : Color.black.opacity(0.06),
+                radius: isSelected && isDragging ? 12 : 6,
+                x: 0,
+                y: isSelected && isDragging ? 6 : 3
+            )
+            .scaleEffect(isHovered ? 1.05 : 1.0)
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: isHovered)
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        }
+        .buttonStyle(.plain)
         .onTapGesture {
             onTap()
         }

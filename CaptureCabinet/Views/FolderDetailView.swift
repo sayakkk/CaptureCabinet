@@ -1,8 +1,8 @@
 //
 //  FolderDetailView.swift
-//  CaptureList
+//  CaptureCabinet
 //
-//  Target: CaptureList
+//  Modern folder detail view with enhanced visual design
 //
 
 import SwiftUI
@@ -30,12 +30,17 @@ struct FolderDetailView: View {
     }
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             if screenshots.isEmpty {
-                PlaceholderView(message: "No items in this folder")
+                PlaceholderView(message: "이 폴더에 스크린샷이 없습니다", icon: "photo.stack")
             } else {
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 16) {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.adaptive(minimum: 100, maximum: 120), spacing: 12)
+                        ],
+                        spacing: 12
+                    ) {
                         ForEach(Array(screenshots.enumerated()), id: \.element.id) { index, screenshot in
                             ScreenshotView(screenshot: screenshot)
                                 .onTapGesture {
@@ -43,20 +48,41 @@ struct FolderDetailView: View {
                                     showingFullScreen = true
                                 }
                                 .onLongPressGesture {
-                                    // Placeholder for scheduling reminder
                                     print("Schedule reminder tapped")
                                 }
                         }
-                    }.padding()
+                    }
+                    .padding(Spacing.lg)
                 }
             }
         }
+        .background(Color.backgroundPrimary)
         .navigationTitle(folder.name ?? "Folder")
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Add Screenshot") {
-                    // Photo access temporarily disabled until privacy permissions are configured
-                    print("Photo access will be available after setting up privacy permissions")
+                Button(action: {
+                    print("Add screenshot functionality")
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.0, green: 0.5, blue: 1.0),
+                                        Color(red: 0.3, green: 0.35, blue: 0.9)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 32, height: 32)
+
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .shadow(color: Color.blue.opacity(0.3), radius: 6, x: 0, y: 3)
                 }
             }
         }
@@ -106,27 +132,42 @@ struct ScreenshotView: View {
     var screenshot: Screenshot
     @State private var image: UIImage?
     @State private var asset: PHAsset?
-    
+
     var body: some View {
         Group {
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(height: 100)
+                    .frame(width: 100, height: 130)
                     .clipped()
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 100)
-                    .cornerRadius(8)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.gray.opacity(0.15),
+                                Color.gray.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 130)
                     .overlay(
                         ProgressView()
-                            .scaleEffect(0.8)
+                            .tint(Color.blue.opacity(0.6))
+                            .scaleEffect(0.9)
                     )
             }
         }
+        .shadow(
+            color: Color.black.opacity(0.08),
+            radius: 8,
+            x: 0,
+            y: 4
+        )
         .onAppear {
             loadAssetAndImage()
         }

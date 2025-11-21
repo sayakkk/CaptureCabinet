@@ -3,6 +3,7 @@
 //  CaptureCabinet
 //
 //  Created by saya lee on 10/1/25.
+//  Updated with native TabView and modern design
 //
 
 import SwiftUI
@@ -18,49 +19,34 @@ struct DragItem {
     let images: [UIImage]
     let startLocation: CGPoint
     var dragOffset: CGSize = .zero
-    
+
     var currentLocation: CGPoint {
         CGPoint(x: startLocation.x + dragOffset.width, y: startLocation.y + dragOffset.height)
     }
 }
 
 struct MainTabView: View {
-    @State private var currentTab: Tab = .recent
     @State private var selectedScreenshots: Set<String> = []
     @State private var isDragging = false
-    
-    // Drag state for custom tab container
+
+    // Drag state for cross-tab drag functionality
     @State private var dragItem: DragItem? = nil
     @State private var dragOffset: CGSize = .zero
     @State private var hasSwitchedToFolders = false
-    
+
     var body: some View {
         ZStack {
-            // Tab content
-            if currentTab == .recent {
+            // Native TabView with modern design
+            TabView {
                 RecentScreenshotsView(
-                    selectedTab: Binding(
-                        get: { currentTab.rawValue },
-                        set: { currentTab = Tab(rawValue: $0) ?? .recent }
-                    ),
                     selectedScreenshots: $selectedScreenshots,
                     isDragging: $isDragging,
                     onDragStart: { item in
                         dragItem = item
                     },
                     onDragChange: { offset, item in
-                        // Update drag offset first
                         dragOffset = offset
                         dragItem = item
-                        
-                        // Switch to folders tab when dragging right 150px (only once)
-                        if offset.width > 150 && currentTab == .recent && !hasSwitchedToFolders {
-                            hasSwitchedToFolders = true
-                            // Switch tabs asynchronously to avoid blocking
-                            DispatchQueue.main.async {
-                                currentTab = .folders
-                            }
-                        }
                     },
                     onDragEnd: {
                         dragItem = nil
@@ -68,11 +54,11 @@ struct MainTabView: View {
                         hasSwitchedToFolders = false
                     }
                 )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .leading),
-                    removal: .move(edge: .leading)
-                ))
-            } else if currentTab == .folders {
+                .tabItem {
+                    Label("최근", systemImage: "photo.on.rectangle.angled")
+                }
+                .tag(Tab.recent)
+
                 FoldersView(
                     selectedScreenshots: $selectedScreenshots,
                     isDragging: $isDragging,
@@ -82,108 +68,26 @@ struct MainTabView: View {
                         handleDrop(assetIds: assetIds)
                     }
                 )
-                .id("foldersView") // Stable identity for view
+                .tabItem {
+                    Label("폴더", systemImage: "folder")
+                }
+                .tag(Tab.folders)
             }
-            
-            // Drag item overlay
+            .tint(Color(red: 0.0, green: 0.48, blue: 1.0)) // Modern blue accent
+
+            // Drag item overlay (appears above TabView)
             if let item = dragItem {
                 DragItemOverlay(item: item)
                     .zIndex(1000)
                     .allowsHitTesting(false)
             }
-            
-            // Custom tab bar
-            VStack {
-                Spacer()
-                CustomTabBar(
-                    currentTab: $currentTab,
-                    isDragging: isDragging
-                )
-            }
-            .zIndex(100)
-        }
-        .onChange(of: currentTab) { oldTab, newTab in
-            // Clear selection when switching tabs, but only if not dragging
-            // Use async to avoid blocking during drag
-            if !isDragging && oldTab != newTab {
-                DispatchQueue.main.async {
-                    selectedScreenshots.removeAll()
-                }
-            }
         }
     }
-    
+
     private func handleDrop(assetIds: [String]) {
-        // Drop handling is done in FoldersView
         dragItem = nil
         dragOffset = .zero
         isDragging = false
-    }
-}
-
-struct CustomTabBar: View {
-    @Binding var currentTab: Tab
-    let isDragging: Bool
-    
-    var body: some View {
-        HStack(spacing: 0) {
-            TabButton(
-                icon: "photo.on.rectangle.angled",
-                selectedIcon: "photo.on.rectangle.angled.fill",
-                title: "최근",
-                isSelected: currentTab == .recent,
-                isDisabled: isDragging
-            ) {
-                if !isDragging {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        currentTab = .recent
-                    }
-                }
-            }
-            
-            TabButton(
-                icon: "folder",
-                selectedIcon: "folder.fill",
-                title: "폴더",
-                isSelected: currentTab == .folders,
-                isDisabled: isDragging
-            ) {
-                if !isDragging {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        currentTab = .folders
-                    }
-                }
-            }
-        }
-        .frame(height: 60)
-        .background(
-            Color.surfacePrimary
-                .shadow(color: Shadow.small, radius: 8, x: 0, y: -2)
-        )
-    }
-}
-
-struct TabButton: View {
-    let icon: String
-    let selectedIcon: String
-    let title: String
-    let isSelected: Bool
-    let isDisabled: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: isSelected ? selectedIcon : icon)
-                    .font(.system(size: 20))
-                Text(title)
-                    .font(.caption)
-            }
-            .frame(maxWidth: .infinity)
-            .foregroundColor(isSelected ? .primaryBlue : .textSecondary)
-            .opacity(isDisabled ? 0.5 : 1.0)
-        }
-        .disabled(isDisabled)
     }
 }
 

@@ -12,19 +12,18 @@ import CoreData
 
 struct RecentScreenshotsView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    
+
     @State private var recentScreenshots: [PHAsset] = []
     @State private var showingPhotoPermissionAlert = false
     @State private var appLaunchTime: Date = Date().addingTimeInterval(-86400) // 24시간 전
-    
+
     @State private var isSelectionMode = false
     @State private var selectedIndices: Set<Int> = []
-    
-    @Binding var selectedTab: Int
+
     @Binding var selectedScreenshots: Set<String>
     @Binding var isDragging: Bool
-    
-    // Drag callbacks for custom tab container
+
+    // Drag callbacks for cross-tab drag functionality
     let onDragStart: ((DragItem) -> Void)?
     let onDragChange: ((CGSize, DragItem) -> Void)?
     let onDragEnd: (() -> Void)?
@@ -38,36 +37,71 @@ struct RecentScreenshotsView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Header
+                // Modern Header with enhanced design
                 HStack {
                     Text("최근 스크린샷")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.textPrimary)
-                    
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color.textPrimary,
+                                    Color.textPrimary.opacity(0.9)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
                     Spacer()
-                    
+
                     if isSelectionMode {
                         Button("취소") {
                             isSelectionMode = false
                             selectedScreenshots.removeAll()
                         }
-                        .foregroundColor(.primaryBlue)
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.0, green: 0.5, blue: 1.0),
+                                    Color(red: 0.3, green: 0.35, blue: 0.9)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     } else {
                         Button(action: {
                             addTestPhoto()
                         }) {
-                            Image(systemName: "plus")
-                                .font(.title3)
-                                .foregroundColor(.primaryBlue)
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.0, green: 0.5, blue: 1.0),
+                                                Color(red: 0.3, green: 0.35, blue: 0.9)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 40, height: 40)
+
+                                Image(systemName: "plus")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
+                            .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
                     }
                 }
                 .padding(.horizontal, Spacing.lg)
-                .padding(.vertical, Spacing.md)
-                
+                .padding(.top, Spacing.lg)
+                .padding(.bottom, Spacing.md)
+
                 Divider()
-                    .background(Color.textTertiary.opacity(0.3))
+                    .background(Color.textTertiary.opacity(0.15))
                 
                 if recentScreenshots.isEmpty {
                     PlaceholderView(message: "최근 스크린샷이 없습니다")
@@ -147,12 +181,6 @@ struct RecentScreenshotsView: View {
             isSelectionMode = true
             selectedScreenshots.insert(assetID)
             selectedIndices.insert(index)
-        }
-    }
-    
-    private func moveToFolders() {
-        if !selectedScreenshots.isEmpty {
-            selectedTab = 1
         }
     }
     
@@ -595,7 +623,6 @@ struct ScreenshotCardView: View {
 
 #Preview {
     RecentScreenshotsView(
-        selectedTab: .constant(0),
         selectedScreenshots: .constant(Set<String>()),
         isDragging: .constant(false),
         onDragStart: { _ in },
