@@ -7,13 +7,14 @@
 
 import SwiftUI
 import CoreData
+import UniformTypeIdentifiers
 
 struct FoldersView: View {
     @Environment(\.managedObjectContext) private var viewContext
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Folder.createdAt, ascending: true)],
-        animation: .default
+        animation: nil
     )
     private var folders: FetchedResults<Folder>
     
@@ -26,6 +27,14 @@ struct FoldersView: View {
     
     // Selected screenshots from RecentScreenshotsView
     @Binding var selectedScreenshots: Set<String>
+    @Binding var isDragging: Bool
+    
+    // Drag state from custom tab container
+    let dragItem: DragItem?
+    let dragOffset: CGSize
+    let onDrop: ([String]) -> Void
+    
+    @State private var selectedFolderForDrop: Folder? = nil
     
     var body: some View {
         NavigationView {
@@ -64,9 +73,11 @@ struct FoldersView: View {
                                     folder: folder,
                                     editingFolder: $editingFolder,
                                     editingText: $editingText,
+                                    isSelected: selectedFolderForDrop?.id == folder.id,
+                                    isDragging: isDragging,
                                     onTap: {
-                                        if !selectedScreenshots.isEmpty {
-                                            saveScreenshotsToFolder(folder: folder)
+                                        if !selectedScreenshots.isEmpty && !isDragging {
+                                            saveScreenshotsToFolder(folder: folder, clearSelection: true)
                                         }
                                     },
                                     onEdit: {
@@ -78,6 +89,21 @@ struct FoldersView: View {
                                     onDelete: {
                                         folderToDelete = folder
                                         showingDeleteAlert = true
+                                    },
+                                    onDropItems: { ids in
+                                        onDrop(ids)
+                                        saveScreenshotsToFolder(folder: folder, assetIDs: ids, clearSelection: true)
+                                        selectedFolderForDrop = nil
+                                    },
+                                    onDragEnter: {
+                                        if isDragging {
+                                            selectedFolderForDrop = folder
+                                        }
+                                    },
+                                    onDragExit: {
+                                        if isDragging {
+                                            selectedFolderForDrop = nil
+                                        }
                                     }
                                 )
                             }
@@ -160,8 +186,10 @@ struct FoldersView: View {
         }
     }
     
-    private func saveScreenshotsToFolder(folder: Folder) {
-        for assetID in selectedScreenshots {
+    private func saveScreenshotsToFolder(folder: Folder, assetIDs: [String]? = nil, clearSelection: Bool = false) {
+        let idsToSave = assetIDs ?? Array(selectedScreenshots)
+        
+        for assetID in idsToSave {
             let screenshot = Screenshot(context: viewContext)
             screenshot.id = UUID()
             screenshot.phAssetID = assetID
@@ -171,8 +199,9 @@ struct FoldersView: View {
         
         do {
             try viewContext.save()
-            // Clear selected screenshots
-            selectedScreenshots.removeAll()
+            if clearSelection {
+                selectedScreenshots.removeAll()
+            }
         } catch {
             let nsError = error as NSError
             print("❌ Core Data save error: \(nsError)")
@@ -232,16 +261,18 @@ struct FolderCardView: View {
     
     @Binding var editingFolder: Folder?
     @Binding var editingText: String
+    let isSelected: Bool
+    let isDragging: Bool
     let onTap: () -> Void
     let onEdit: () -> Void
     let onDuplicate: () -> Void
     let onDelete: () -> Void
+    let onDropItems: ([String]) -> Void
+    let onDragEnter: () -> Void
+    let onDragExit: () -> Void
     
     @State private var isHovered = false
-    
-    private var screenshotCount: Int {
-        folder.screenshots?.count ?? 0
-    }
+    @State private var isDropTargeted = false
     
     var body: some View {
         VStack(spacing: Spacing.sm) {
@@ -261,6 +292,17 @@ struct FolderCardView: View {
             RoundedRectangle(cornerRadius: CornerRadius.lg)
                 .fill(Color.surfacePrimary)
         )
+        .overlay(
+            Group {
+                if isSelected && isDragging {
+                    RoundedRectangle(cornerRadius: CornerRadius.lg)
+                        .stroke(Color.primaryBlue, lineWidth: 3)
+                } else if isDropTargeted {
+                    RoundedRectangle(cornerRadius: CornerRadius.lg)
+                        .stroke(Color.primaryBlue.opacity(0.5), lineWidth: 2)
+                }
+            }
+        )
         .shadow(color: Shadow.small, radius: 2, x: 0, y: 1)
         .scaleEffect(isHovered ? 1.05 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isHovered)
@@ -278,6 +320,37 @@ struct FolderCardView: View {
             
             Button("삭제하기", role: .destructive) {
                 onDelete()
+            }
+        }
+        .onDrop(of: [UTType.text, UTType.plainText], isTargeted: $isDropTargeted) { providers in
+            // Call onDragEnter when drop target enters
+            if isDropTargeted && !isSelected && isDragging {
+                onDragEnter()
+            }
+            
+            let typeIdentifiers = [UTType.text.identifier, UTType.plainText.identifier]
+            
+            for provider in providers {
+                guard let typeId = typeIdentifiers.first(where: { provider.hasItemConformingToTypeIdentifier($0) }) else {
+                    continue
+                }
+                
+                provider.loadDataRepresentation(forTypeIdentifier: typeId) { data, _ in
+                    guard let data = data, let text = String(data: data, encoding: .utf8) else { return }
+                    let ids = text.split(separator: ",").map { String($0) }
+                    DispatchQueue.main.async {
+                        onDropItems(ids)
+                        onDragExit()
+                    }
+                }
+            }
+            return true
+        }
+        .onChange(of: isDropTargeted) { oldValue, newValue in
+            if newValue && isDragging && !isSelected {
+                onDragEnter()
+            } else if !newValue && isDragging && isSelected {
+                onDragExit()
             }
         }
         .onHover { hovering in
@@ -326,5 +399,11 @@ struct RenameDialogView: View {
 
 
 #Preview {
-    FoldersView(selectedScreenshots: .constant(Set<String>()))
+    FoldersView(
+        selectedScreenshots: .constant(Set<String>()),
+        isDragging: .constant(false),
+        dragItem: nil,
+        dragOffset: .zero,
+        onDrop: { _ in }
+    )
 }
