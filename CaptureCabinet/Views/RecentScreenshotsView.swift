@@ -86,18 +86,37 @@ struct RecentScreenshotsView: View {
                                 .listRowInsets(EdgeInsets(top: 9, leading: 0, bottom: 9, trailing: 0))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    // 왼쪽 스와이프: 삭제
+                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                    // 오른쪽 스와이프: 삭제 (왼쪽에 나타남)
                                     Button(role: .destructive) {
                                         deleteScreenshot(asset: asset)
                                     } label: {
                                         Label("삭제", systemImage: "trash")
                                     }
+                                    .tint(Color.red)
                                 }
-                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                    // 오른쪽 스와이프: 폴더 선택
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    // 왼쪽 스와이프: 폴더 선택 (오른쪽에 나타남)
+                                    // 버튼은 역순으로 표시되므로 뒤에서부터 추가
 
-                                    // "..." 버튼 (폴더가 5개 이상일 때)
+                                    // 폴더가 5개 이상일 때: 4, 5번째 폴더 표시
+                                    if folders.count > 5 {
+                                        ForEach(Array(folders.dropFirst(3).prefix(2)), id: \.id) { folder in
+                                            Button {
+                                                saveToFolder(asset: asset, folder: folder)
+                                            } label: {
+                                                VStack(spacing: 4) {
+                                                    Image(systemName: "folder.fill")
+                                                    Text(folder.name ?? "")
+                                                        .font(.caption2)
+                                                        .lineLimit(1)
+                                                }
+                                            }
+                                            .tint(Color.orange)
+                                        }
+                                    }
+
+                                    // "..." 버튼 (폴더가 5개 이상일 때) - 4번째 위치
                                     if folders.count > 5 {
                                         Button {
                                             selectedAssetForFolder = asset
@@ -112,8 +131,8 @@ struct RecentScreenshotsView: View {
                                         .tint(Color.gray)
                                     }
 
-                                    // 처음 5개 폴더
-                                    ForEach(folders.prefix(5), id: \.id) { folder in
+                                    // 처음 3개 (또는 5개 이하면 모든) 폴더
+                                    ForEach(folders.prefix(folders.count > 5 ? 3 : min(folders.count, 5)), id: \.id) { folder in
                                         Button {
                                             saveToFolder(asset: asset, folder: folder)
                                         } label: {
@@ -256,15 +275,22 @@ struct RecentScreenshotsView: View {
     // MARK: - Swipe Actions
 
     private func deleteScreenshot(asset: PHAsset) {
+        // Remove from UI immediately to prevent List update crash
+        withAnimation {
+            recentScreenshots.removeAll { $0.localIdentifier == asset.localIdentifier }
+        }
+
+        // Delete from photo library
         PHPhotoLibrary.shared().performChanges({
             PHAssetChangeRequest.deleteAssets([asset] as NSArray)
         }) { success, error in
             DispatchQueue.main.async {
                 if success {
                     print("✅ Screenshot deleted from photo library")
-                    loadRecentScreenshots()
                 } else if let error = error {
                     print("❌ Failed to delete screenshot: \(error)")
+                    // If deletion failed, reload to restore the asset
+                    loadRecentScreenshots()
                 }
             }
         }
