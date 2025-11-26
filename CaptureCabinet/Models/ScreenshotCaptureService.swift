@@ -200,8 +200,8 @@ class ScreenshotCaptureService: ObservableObject {
         updatedState.savedSuccessfully = success
         await activity.update(.init(state: updatedState, staleDate: nil))
 
-        // End activity after 2 seconds
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        // Show checkmark for 0.5 seconds then dismiss
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         await endCurrentActivity()
     }
 
