@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreData
 import Photos
+import PhotosUI
 
 struct FolderDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -18,6 +19,7 @@ struct FolderDetailView: View {
     @State private var showingPhotoPermissionAlert = false
     @State private var showingFullScreen = false
     @State private var selectedScreenshotIndex = 0
+    @State private var selectedPhotos: [PhotosPickerItem] = []
 
     init(folder: Folder) {
         self.folder = folder
@@ -61,29 +63,53 @@ struct FolderDetailView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    print("Add screenshot functionality")
-                }) {
+                PhotosPicker(
+                    selection: $selectedPhotos,
+                    maxSelectionCount: nil,
+                    matching: .images
+                ) {
                     ZStack {
+                        // iOS 26 liquid glass background
                         Circle()
-                            .fill(
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 36, height: 36)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            colors: [
+                                                .white.opacity(0.4),
+                                                .white.opacity(0.1)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1.5
+                                    )
+                            )
+                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+
+                        // Plus icon with gradient
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(
                                 LinearGradient(
                                     colors: [
-                                        Color(red: 0.0, green: 0.5, blue: 1.0),
-                                        Color(red: 0.3, green: 0.35, blue: 0.9)
+                                        Color.accentPrimary,
+                                        Color.accentSecondary
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
-                            .frame(width: 32, height: 32)
-
-                        Image(systemName: "plus")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
                     }
-                    .shadow(color: Color.blue.opacity(0.3), radius: 6, x: 0, y: 3)
                 }
+            }
+        }
+        .onChange(of: selectedPhotos) { oldValue, newValue in
+            guard !newValue.isEmpty else { return }
+            Task {
+                await addPhotosToFolder(newValue)
             }
         }
         .alert("Photo Permission Required", isPresented: $showingPhotoPermissionAlert) {
@@ -124,6 +150,139 @@ struct FolderDetailView: View {
             }
         @unknown default:
             break
+        }
+    }
+
+    private func addPhotosToFolder(_ photoItems: [PhotosPickerItem]) async {
+        print("📸 Starting to add \(photoItems.count) photos to folder: \(folder.name ?? "Unknown")")
+        print("🔍 PhotoItems received: \(photoItems)")
+
+        for (index, item) in photoItems.enumerated() {
+            print("\n🔄 Processing photo \(index + 1)/\(photoItems.count)")
+            print("📦 PhotosPickerItem: \(item)")
+
+            // Try to get the asset identifier
+            if let assetIdentifier = item.itemIdentifier {
+                print("🆔 Item identifier found: \(assetIdentifier)")
+
+                // Fetch PHAsset using identifier
+                let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil)
+
+                if let asset = fetchResult.firstObject {
+                    print("✓ Found PHAsset with localIdentifier: \(asset.localIdentifier)")
+
+                    // Add to Core Data on main thread
+                    await MainActor.run {
+                        do {
+                            // Check if already exists in this folder
+                            let fetchRequest: NSFetchRequest<Screenshot> = Screenshot.fetchRequest()
+                            fetchRequest.predicate = NSPredicate(format: "phAssetID == %@ AND folder == %@", asset.localIdentifier, folder)
+
+                            let existingScreenshots = try viewContext.fetch(fetchRequest)
+
+                            if existingScreenshots.isEmpty {
+                                print("➕ Creating new screenshot entity...")
+
+                                // Create new screenshot entity
+                                let screenshot = Screenshot(context: viewContext)
+                                screenshot.id = UUID()
+                                screenshot.phAssetID = asset.localIdentifier
+                                screenshot.createdAt = Date()
+                                screenshot.folder = folder
+
+                                print("💾 Saving to Core Data...")
+                                try viewContext.save()
+
+                                print("✅ Successfully saved photo \(index + 1) to folder")
+
+                                // Trigger haptic feedback for success
+                                let generator = UINotificationFeedbackGenerator()
+                                generator.notificationOccurred(.success)
+                            } else {
+                                print("ℹ️ Photo \(index + 1) already exists in this folder, skipping")
+                            }
+                        } catch {
+                            print("❌ Failed to add photo \(index + 1): \(error)")
+                            print("❌ Error details: \(error.localizedDescription)")
+                        }
+                    }
+                } else {
+                    print("❌ PHAsset not found for identifier: \(assetIdentifier)")
+                }
+            } else {
+                print("❌ No asset identifier for item \(index + 1)")
+                print("⚠️ Trying alternative approach: saving to photo library first...")
+
+                // Alternative approach: load the image and save to photo library
+                do {
+                    if let data = try await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        print("✓ Loaded image data: \(data.count) bytes")
+
+                        // Save to photo library and get the asset
+                        let assetID = await saveImageToPhotoLibrary(image)
+
+                        if let assetID = assetID {
+                            print("✓ Saved to photo library with ID: \(assetID)")
+
+                            // Now add this asset to the folder
+                            await MainActor.run {
+                                do {
+                                    let screenshot = Screenshot(context: viewContext)
+                                    screenshot.id = UUID()
+                                    screenshot.phAssetID = assetID
+                                    screenshot.createdAt = Date()
+                                    screenshot.folder = folder
+
+                                    try viewContext.save()
+                                    print("✅ Successfully saved photo \(index + 1) to folder")
+
+                                    // Trigger haptic feedback for success
+                                    let generator = UINotificationFeedbackGenerator()
+                                    generator.notificationOccurred(.success)
+                                } catch {
+                                    print("❌ Failed to save to Core Data: \(error)")
+                                }
+                            }
+                        } else {
+                            print("❌ Failed to save image to photo library")
+                        }
+                    } else {
+                        print("❌ Failed to load transferable data or create image")
+                    }
+                } catch {
+                    print("❌ Error loading transferable: \(error)")
+                }
+            }
+        }
+
+        // Clear selection after processing
+        await MainActor.run {
+            selectedPhotos.removeAll()
+            print("\n✅ Finished processing all photos. Selection cleared.")
+
+            // Post notification to refresh views
+            NotificationCenter.default.post(name: NSNotification.Name("ReloadRecentScreenshots"), object: nil)
+            print("📢 Posted reload notification")
+        }
+    }
+
+    private func saveImageToPhotoLibrary(_ image: UIImage) async -> String? {
+        return await withCheckedContinuation { continuation in
+            var localIdentifier: String?
+
+            PHPhotoLibrary.shared().performChanges({
+                let request = PHAssetChangeRequest.creationRequestForAsset(from: image)
+                localIdentifier = request.placeholderForCreatedAsset?.localIdentifier
+            }) { success, error in
+                if success, let identifier = localIdentifier {
+                    print("✓ Image saved to photo library: \(identifier)")
+                    continuation.resume(returning: identifier)
+                } else {
+                    print("❌ Failed to save image to photo library: \(error?.localizedDescription ?? "Unknown error")")
+                    continuation.resume(returning: nil)
+                }
+            }
         }
     }
 }
